@@ -231,7 +231,7 @@ impl WWMemory {
         if file_type.is_dir() {
             let path = w.as_ref().unwrap().path.clone();
 
-            // if the dirst go last, then we want to push the dir's entry before
+            // if the dirs go last, then we want to push the dir's entry before
             // the directory, so it gets emitted after processing it.
             if self.config.dirs == DirPosition::Last {
                 self.work.push(WEntry::Emit(w.take().unwrap()));
