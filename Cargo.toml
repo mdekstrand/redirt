@@ -1,0 +1,21 @@
+[package]
+name = "rdt"
+version = "0.1.0"
+edition = "2021"
+description = "Recursive Directory Tool"
+authors = ["Michael Ekstrand <md@ekstrandom.net>"]
+
+[dependencies]
+# basic reporting support
+log = "^0.4"
+thiserror = "^1.0"
+friendly = "^0.1"
+
+happylog = { git = "https://github.com/mdekstrand/happylog.git", features = [
+  "clap",
+] }
+# interface
+anyhow = "1"
+indicatif = "0.17"
+enum_dispatch = "0.3"
+clap = "4.0"
