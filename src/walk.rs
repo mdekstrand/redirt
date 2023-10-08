@@ -10,6 +10,7 @@ use std::{fs, io, thread};
 use log::*;
 
 use crate::fsutils::is_hidden;
+use crate::stack::Stack;
 
 const DEFAULT_BUFFER: usize = 1000;
 
@@ -45,12 +46,13 @@ pub struct WalkEntry {
 
 struct WWMemory {
     config: WalkBuilder,
-    stack: Option<Box<QueueNode>>,
+    work: Stack<WEntry>,
 }
 
-/// Entry in the walk worker queue.
-enum QueueEntry {
-    Scan(PathBuf),
+/// Entry in the walk worker stack.
+enum WEntry {
+    /// Scan a directory.
+    ScanDir(PathBuf),
     Emit(WalkEntry),
     Process {
         dir: PathBuf,
@@ -58,14 +60,9 @@ enum QueueEntry {
     },
 }
 
-struct QueueNode {
-    entry: QueueEntry,
-    next: Option<Box<QueueNode>>,
-}
-
 /// Single task in the walk worker.
-enum QueueTask {
-    Scan(PathBuf),
+enum WTask {
+    ScanDir(PathBuf),
     Emit(WalkEntry),
     Process { dir: PathBuf, entry: DirEntry },
     Noop,
@@ -117,7 +114,7 @@ impl WalkBuilder {
         debug!("starting directory scan at {:?}", self.root);
         let mut count = 0;
         let mut stack = WWMemory::new(self);
-        stack.push_dir(PathBuf::new());
+        stack.work.push(WEntry::ScanDir(PathBuf::new()));
         loop {
             match stack.pump(&chan) {
                 Ok(n) if n < 0 => return count,
@@ -136,48 +133,24 @@ impl WWMemory {
     fn new(config: WalkBuilder) -> WWMemory {
         WWMemory {
             config,
-            stack: None,
+            work: Stack::new(),
         }
-    }
-
-    fn push_dir(&mut self, path: PathBuf) {
-        let next = self.stack.take();
-        self.stack = Some(Box::new(QueueNode {
-            entry: QueueEntry::Scan(path),
-            next,
-        }));
-    }
-
-    fn push_dir_queue(&mut self, dir: PathBuf, entries: VecDeque<DirEntry>) {
-        let next = self.stack.take();
-        self.stack = Some(Box::new(QueueNode {
-            entry: QueueEntry::Process { dir, entries },
-            next,
-        }));
-    }
-
-    fn push_entry(&mut self, w: WalkEntry) {
-        let next = self.stack.take();
-        self.stack = Some(Box::new(QueueNode {
-            entry: QueueEntry::Emit(w),
-            next,
-        }));
     }
 
     fn pump(&mut self, chan: &SyncSender<io::Result<WalkEntry>>) -> io::Result<i32> {
         match self.next_task() {
-            QueueTask::Scan(dir) => {
+            WTask::ScanDir(dir) => {
                 let entries = self.scan_dir(&dir)?;
-                self.push_dir_queue(dir, entries);
+                self.work.push(WEntry::Process { dir, entries });
                 Ok(0)
             }
 
-            QueueTask::Emit(w) => {
+            WTask::Emit(w) => {
                 chan.send(Ok(w)).expect("receiver hung up");
                 Ok(1)
             }
 
-            QueueTask::Process { dir, entry } => {
+            WTask::Process { dir, entry } => {
                 if let Some(w) = self.scan_entry(dir, entry)? {
                     chan.send(Ok(w)).expect("receiver hung up");
                     Ok(1)
@@ -186,39 +159,28 @@ impl WWMemory {
                 }
             }
 
-            QueueTask::Noop => Ok(0),
+            WTask::Noop => Ok(0),
 
-            QueueTask::Finished => Ok(-1),
+            WTask::Finished => Ok(-1),
         }
     }
 
-    fn next_task(&mut self) -> QueueTask {
-        if let Some(mut node) = self.stack.take() {
-            match node.entry {
-                QueueEntry::Scan(dir) => {
-                    self.stack = node.next;
-                    QueueTask::Scan(dir)
-                }
-                QueueEntry::Emit(w) => {
-                    self.stack = node.next;
-                    QueueTask::Emit(w)
-                }
-                QueueEntry::Process {
-                    ref dir,
-                    ref mut entries,
-                } => {
-                    if let Some(entry) = entries.pop_front() {
-                        let dir = dir.clone();
-                        self.stack = Some(node);
-                        QueueTask::Process { dir, entry }
-                    } else {
-                        self.stack = node.next;
-                        QueueTask::Noop
-                    }
+    fn next_task(&mut self) -> WTask {
+        match self.work.pop() {
+            Some(WEntry::ScanDir(dir)) => WTask::ScanDir(dir),
+            Some(WEntry::Emit(w)) => WTask::Emit(w),
+            Some(WEntry::Process { dir, mut entries }) => {
+                if let Some(entry) = entries.pop_front() {
+                    self.work.push(WEntry::Process {
+                        dir: dir.clone(),
+                        entries,
+                    });
+                    WTask::Process { dir, entry }
+                } else {
+                    WTask::Noop
                 }
             }
-        } else {
-            QueueTask::Finished
+            None => WTask::Finished,
         }
     }
 
@@ -272,10 +234,10 @@ impl WWMemory {
             // if the dirst go last, then we want to push the dir's entry before
             // the directory, so it gets emitted after processing it.
             if self.config.dirs == DirPosition::Last {
-                self.push_entry(w.take().unwrap());
+                self.work.push(WEntry::Emit(w.take().unwrap()));
             }
 
-            self.push_dir(path);
+            self.work.push(WEntry::ScanDir(path));
 
             // if never, then clear out the entry.
             if self.config.dirs == DirPosition::Never {

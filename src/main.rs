@@ -4,6 +4,7 @@ use log::*;
 
 mod commands;
 mod fsutils;
+mod stack;
 pub mod walk;
 
 use commands::{Command, DirCommands};
