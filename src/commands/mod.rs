@@ -1,4 +1,4 @@
-use clap::Subcommand;
+use clap::{Args, Subcommand};
 use enum_dispatch::*;
 
 mod list;
@@ -13,4 +13,11 @@ pub trait Command {
 #[enum_dispatch(Command)]
 pub enum DirCommands {
     List(list::ListCmd),
+}
+
+#[derive(Args, Debug)]
+struct TraverseFlags {
+    /// Follow symbolic links when traversing and copying
+    #[arg(short = 'L', long = "follow")]
+    follow_symlinks: bool,
 }

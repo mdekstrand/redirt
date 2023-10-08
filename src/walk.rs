@@ -4,9 +4,8 @@ use std::collections::VecDeque;
 use std::fs::{read_dir, DirEntry, FileType};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::thread::JoinHandle;
 use std::time::SystemTime;
-use std::{io, thread};
+use std::{fs, io, thread};
 
 use log::*;
 
@@ -16,12 +15,12 @@ const DEFAULT_BUFFER: usize = 1000;
 pub struct WalkBuilder {
     root: PathBuf,
     buf_size: usize,
+    follow_symlinks: bool,
 }
 
 /// Implementation of tree-walking.
 pub struct Walker {
     channel: Receiver<io::Result<WalkEntry>>,
-    handle: JoinHandle<usize>,
 }
 
 /// Single result entry in a tree-walk.
@@ -66,17 +65,23 @@ impl WalkBuilder {
         WalkBuilder {
             root: root.as_ref().to_owned(),
             buf_size: DEFAULT_BUFFER,
+            follow_symlinks: false,
+        }
+    }
+
+    /// Follow symbolic links.
+    pub fn follow_symlinks(self) -> WalkBuilder {
+        WalkBuilder {
+            follow_symlinks: true,
+            ..self
         }
     }
 
     /// Start walking the directory.
     pub fn walk(self) -> Walker {
         let (send, recv) = sync_channel(self.buf_size);
-        let handle = thread::spawn(move || self.walk_worker(send));
-        Walker {
-            channel: recv,
-            handle,
-        }
+        let _handle = thread::spawn(move || self.walk_worker(send));
+        Walker { channel: recv }
     }
 
     fn walk_worker(self, chan: SyncSender<io::Result<WalkEntry>>) -> usize {
@@ -194,9 +199,13 @@ impl WWMemory {
             dir.display(),
             entry.file_name().to_string_lossy()
         );
-        let meta = entry.metadata()?;
-        let file_type = meta.file_type();
         let path = dir.join(entry.file_name());
+        let meta = if self.config.follow_symlinks {
+            fs::metadata(self.config.root.join(&path))?
+        } else {
+            entry.metadata()?
+        };
+        let file_type = meta.file_type();
 
         if file_type.is_dir() {
             self.push_dir(path.clone());
