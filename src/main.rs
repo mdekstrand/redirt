@@ -3,6 +3,7 @@ use clap::{Args, Parser, Subcommand};
 use log::*;
 
 mod commands;
+mod fsutils;
 pub mod walk;
 
 use commands::{Command, DirCommands};

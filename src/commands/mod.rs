@@ -20,4 +20,8 @@ struct TraverseFlags {
     /// Follow symbolic links when traversing and copying
     #[arg(short = 'L', long = "follow")]
     follow_symlinks: bool,
+
+    /// Include hidden files
+    #[arg(short = 'H', long = "hidden")]
+    include_hidden: bool,
 }

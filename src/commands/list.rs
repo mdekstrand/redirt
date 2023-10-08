@@ -25,9 +25,8 @@ impl Command for ListCmd {
     fn run(&self) -> anyhow::Result<()> {
         info!("listing direectory {:?}", self.dir);
         let mut walk = WalkBuilder::for_directory(&self.dir);
-        if self.traverse.follow_symlinks {
-            walk = walk.follow_symlinks();
-        }
+        walk = walk.follow_symlinks(self.traverse.follow_symlinks);
+        walk = walk.include_hidden(self.traverse.include_hidden);
         let walk = walk.walk();
         let mut n = 0;
         for entry in walk {

@@ -9,6 +9,8 @@ use std::{fs, io, thread};
 
 use log::*;
 
+use crate::fsutils::is_hidden;
+
 const DEFAULT_BUFFER: usize = 1000;
 
 /// Set up a tree-walker.
@@ -16,6 +18,7 @@ pub struct WalkBuilder {
     root: PathBuf,
     buf_size: usize,
     follow_symlinks: bool,
+    include_hidden: bool,
 }
 
 /// Implementation of tree-walking.
@@ -66,13 +69,26 @@ impl WalkBuilder {
             root: root.as_ref().to_owned(),
             buf_size: DEFAULT_BUFFER,
             follow_symlinks: false,
+            include_hidden: true,
         }
     }
 
-    /// Follow symbolic links.
-    pub fn follow_symlinks(self) -> WalkBuilder {
+    /// Follow symbolic links (off by default).
+    pub fn follow_symlinks(self, follow: bool) -> WalkBuilder {
         WalkBuilder {
-            follow_symlinks: true,
+            follow_symlinks: follow,
+            ..self
+        }
+    }
+
+    /// Include hidden files (on by default).
+    ///
+    /// When `false`, this omits hidden files (beginning with `.` on Unix, and
+    /// the HIDDEN attribute on Windows).  While it is on by default in the API,
+    /// it is off by default in the CLI.
+    pub fn include_hidden(self, include: bool) -> WalkBuilder {
+        WalkBuilder {
+            include_hidden: include,
             ..self
         }
     }
@@ -186,7 +202,9 @@ impl WWMemory {
 
         for ent in dir {
             let ent = ent?;
-            entries.push(ent);
+            if self.config.include_hidden || !is_hidden(&ent)? {
+                entries.push(ent);
+            }
         }
         entries.sort_by_key(|e| e.file_name());
         Ok(entries.into())
