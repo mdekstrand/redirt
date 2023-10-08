@@ -20,11 +20,13 @@ pub struct ListCmd {
 
 impl Command for ListCmd {
     fn run(&self) -> anyhow::Result<()> {
+        info!("listing direectory {:?}", self.dir);
         let walk = WalkBuilder::for_directory(&self.dir).walk();
         let mut n = 0;
         for entry in walk {
+            let entry = entry?;
             n += 1;
-            println!("dir");
+            println!("{}", entry.path().display());
         }
         info!("{}: walked {} entries", self.dir.display(), n);
         Ok(())

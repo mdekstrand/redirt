@@ -22,5 +22,6 @@ fn main() -> Result<()> {
     let cli = RDTCLI::parse();
     cli.logging.init()?;
     debug!("starting rdt");
+    cli.command.run();
     Ok(())
 }
