@@ -5,6 +5,7 @@ use std::fs::{read_dir, DirEntry, FileType};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::thread::JoinHandle;
+use std::time::SystemTime;
 use std::{io, thread};
 
 use log::*;
@@ -28,6 +29,8 @@ pub struct WalkEntry {
     path: PathBuf,
     file_type: FileType,
     size: u64,
+    mtime: Option<SystemTime>,
+    ctime: Option<SystemTime>,
 }
 
 struct WWMemory {
@@ -203,6 +206,8 @@ impl WWMemory {
             path,
             file_type,
             size: meta.len(),
+            mtime: meta.modified().ok(),
+            ctime: meta.created().ok(),
         };
         Ok(w)
     }
