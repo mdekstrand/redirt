@@ -1,8 +1,8 @@
 //! Walk file trees.
 
-use std::collections::VecDeque;
 use std::fs::{read_dir, DirEntry, FileType};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::time::SystemTime;
 use std::{fs, io, thread};
@@ -46,27 +46,14 @@ pub struct WalkEntry {
 
 struct WWMemory {
     config: WalkBuilder,
-    work: Stack<WEntry>,
+    work: Stack<WTask>,
 }
 
-/// Entry in the walk worker stack.
-enum WEntry {
-    /// Scan a directory.
-    ScanDir(PathBuf),
-    Emit(WalkEntry),
-    Process {
-        dir: PathBuf,
-        entries: VecDeque<DirEntry>,
-    },
-}
-
-/// Single task in the walk worker.
+/// Task in the walk worker trampoline.
 enum WTask {
     ScanDir(PathBuf),
     Emit(WalkEntry),
-    Process { dir: PathBuf, entry: DirEntry },
-    Noop,
-    Finished,
+    Process { dir: Rc<PathBuf>, entry: DirEntry },
 }
 
 impl WalkBuilder {
@@ -114,7 +101,7 @@ impl WalkBuilder {
         debug!("starting directory scan at {:?}", self.root);
         let mut count = 0;
         let mut stack = WWMemory::new(self);
-        stack.work.push(WEntry::ScanDir(PathBuf::new()));
+        stack.work.push(WTask::ScanDir(PathBuf::new()));
         loop {
             match stack.pump(&chan) {
                 Ok(n) if n < 0 => return count,
@@ -138,20 +125,19 @@ impl WWMemory {
     }
 
     fn pump(&mut self, chan: &SyncSender<io::Result<WalkEntry>>) -> io::Result<i32> {
-        match self.next_task() {
-            WTask::ScanDir(dir) => {
-                let entries = self.scan_dir(&dir)?;
-                self.work.push(WEntry::Process { dir, entries });
+        match self.work.pop() {
+            Some(WTask::ScanDir(dir)) => {
+                self.scan_dir(dir.as_path())?;
                 Ok(0)
             }
 
-            WTask::Emit(w) => {
+            Some(WTask::Emit(w)) => {
                 chan.send(Ok(w)).expect("receiver hung up");
                 Ok(1)
             }
 
-            WTask::Process { dir, entry } => {
-                if let Some(w) = self.scan_entry(dir, entry)? {
+            Some(WTask::Process { dir, entry }) => {
+                if let Some(w) = self.scan_entry(dir.as_ref(), entry)? {
                     chan.send(Ok(w)).expect("receiver hung up");
                     Ok(1)
                 } else {
@@ -159,40 +145,19 @@ impl WWMemory {
                 }
             }
 
-            WTask::Noop => Ok(0),
-
-            WTask::Finished => Ok(-1),
+            None => Ok(-1),
         }
     }
 
-    fn next_task(&mut self) -> WTask {
-        match self.work.pop() {
-            Some(WEntry::ScanDir(dir)) => WTask::ScanDir(dir),
-            Some(WEntry::Emit(w)) => WTask::Emit(w),
-            Some(WEntry::Process { dir, mut entries }) => {
-                if let Some(entry) = entries.pop_front() {
-                    self.work.push(WEntry::Process {
-                        dir: dir.clone(),
-                        entries,
-                    });
-                    WTask::Process { dir, entry }
-                } else {
-                    WTask::Noop
-                }
-            }
-            None => WTask::Finished,
-        }
-    }
-
-    fn scan_dir<P: AsRef<Path>>(&mut self, path: P) -> io::Result<VecDeque<DirEntry>> {
+    fn scan_dir<P: AsRef<Path>>(&mut self, path: P) -> io::Result<()> {
         debug!(
             "{}: scanning dir {}",
             self.config.root.display(),
             path.as_ref().display()
         );
-        let dir = self.config.root.join(path);
-        trace!("scanning {:?}", dir);
-        let dir = read_dir(&dir)?;
+        let path = Rc::new(self.config.root.join(path));
+        trace!("scanning {:?}", path);
+        let dir = read_dir(path.as_ref())?;
         let mut entries = Vec::with_capacity(100);
 
         for ent in dir {
@@ -202,10 +167,19 @@ impl WWMemory {
             }
         }
         entries.sort_by_key(|e| e.file_name());
-        Ok(entries.into())
+
+        // now push the entries to the stack in *reverse* order, so they're
+        // popped in sorted order
+        while let Some(entry) = entries.pop() {
+            self.work.push(WTask::Process {
+                dir: path.clone(),
+                entry,
+            });
+        }
+        Ok(())
     }
 
-    fn scan_entry(&mut self, dir: PathBuf, entry: DirEntry) -> io::Result<Option<WalkEntry>> {
+    fn scan_entry(&mut self, dir: &Path, entry: DirEntry) -> io::Result<Option<WalkEntry>> {
         debug!(
             "{} / {}: scanning entry {}",
             self.config.root.display(),
@@ -234,10 +208,10 @@ impl WWMemory {
             // if the dirs go last, then we want to push the dir's entry before
             // the directory, so it gets emitted after processing it.
             if self.config.dirs == DirPosition::Last {
-                self.work.push(WEntry::Emit(w.take().unwrap()));
+                self.work.push(WTask::Emit(w.take().unwrap()));
             }
 
-            self.work.push(WEntry::ScanDir(path));
+            self.work.push(WTask::ScanDir(path));
 
             // if never, then clear out the entry.
             if self.config.dirs == DirPosition::Never {
