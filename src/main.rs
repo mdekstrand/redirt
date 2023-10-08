@@ -30,10 +30,7 @@ impl RDTCLI {
             verbose -= 1;
         }
 
-        stderrlog::new()
-            .module(module_path!())
-            .verbosity(verbose)
-            .init()?;
+        stderrlog::new().verbosity(verbose).init()?;
         Ok(())
     }
 }
