@@ -37,6 +37,7 @@ pub struct Walker {
 }
 
 /// Single result entry in a tree-walk.
+#[derive(Clone)]
 pub struct WalkEntry {
     path: PathBuf,
     meta: fs::Metadata,
@@ -153,9 +154,9 @@ impl WWMemory {
             self.config.root.display(),
             path.as_ref().display()
         );
-        let path = Rc::new(self.config.root.join(path));
+        let path = Rc::new(path.as_ref().to_path_buf());
         trace!("scanning {:?}", path);
-        let dir = read_dir(path.as_ref())?;
+        let dir = read_dir(self.config.root.join(path.as_ref()))?;
         let mut entries = Vec::with_capacity(100);
 
         for ent in dir {

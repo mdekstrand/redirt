@@ -3,6 +3,7 @@ use enum_dispatch::*;
 
 use crate::walk::WalkBuilder;
 
+mod compare;
 mod list;
 
 /// Interface for RDT commands.
@@ -15,6 +16,7 @@ pub trait Command {
 #[enum_dispatch(Command)]
 pub enum DirCommands {
     List(list::ListCmd),
+    Compare(compare::DiffCmd),
 }
 
 #[derive(Args, Debug)]
