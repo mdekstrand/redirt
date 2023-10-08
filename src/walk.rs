@@ -13,12 +13,20 @@ use crate::fsutils::is_hidden;
 
 const DEFAULT_BUFFER: usize = 1000;
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum DirPosition {
+    First,
+    Last,
+    Never,
+}
+
 /// Set up a tree-walker.
 pub struct WalkBuilder {
     root: PathBuf,
     buf_size: usize,
     follow_symlinks: bool,
     include_hidden: bool,
+    dirs: DirPosition,
 }
 
 /// Implementation of tree-walking.
@@ -43,6 +51,7 @@ struct WWMemory {
 /// Entry in the walk worker queue.
 enum QueueEntry {
     Scan(PathBuf),
+    Emit(WalkEntry),
     Process {
         dir: PathBuf,
         entries: VecDeque<DirEntry>,
@@ -57,6 +66,7 @@ struct QueueNode {
 /// Single task in the walk worker.
 enum QueueTask {
     Scan(PathBuf),
+    Emit(WalkEntry),
     Process { dir: PathBuf, entry: DirEntry },
     Noop,
     Finished,
@@ -70,15 +80,14 @@ impl WalkBuilder {
             buf_size: DEFAULT_BUFFER,
             follow_symlinks: false,
             include_hidden: true,
+            dirs: DirPosition::First,
         }
     }
 
     /// Follow symbolic links (off by default).
-    pub fn follow_symlinks(self, follow: bool) -> WalkBuilder {
-        WalkBuilder {
-            follow_symlinks: follow,
-            ..self
-        }
+    pub fn follow_symlinks(&mut self, follow: bool) -> &mut WalkBuilder {
+        self.follow_symlinks = follow;
+        self
     }
 
     /// Include hidden files (on by default).
@@ -86,11 +95,15 @@ impl WalkBuilder {
     /// When `false`, this omits hidden files (beginning with `.` on Unix, and
     /// the HIDDEN attribute on Windows).  While it is on by default in the API,
     /// it is off by default in the CLI.
-    pub fn include_hidden(self, include: bool) -> WalkBuilder {
-        WalkBuilder {
-            include_hidden: include,
-            ..self
-        }
+    pub fn include_hidden(&mut self, include: bool) -> &mut WalkBuilder {
+        self.include_hidden = include;
+        self
+    }
+
+    /// Specify when directories are listed (first by default).
+    pub fn dir_position(&mut self, pos: DirPosition) -> &mut WalkBuilder {
+        self.dirs = pos;
+        self
     }
 
     /// Start walking the directory.
@@ -143,6 +156,14 @@ impl WWMemory {
         }));
     }
 
+    fn push_entry(&mut self, w: WalkEntry) {
+        let next = self.stack.take();
+        self.stack = Some(Box::new(QueueNode {
+            entry: QueueEntry::Emit(w),
+            next,
+        }));
+    }
+
     fn pump(&mut self, chan: &SyncSender<io::Result<WalkEntry>>) -> io::Result<i32> {
         match self.next_task() {
             QueueTask::Scan(dir) => {
@@ -151,10 +172,18 @@ impl WWMemory {
                 Ok(0)
             }
 
-            QueueTask::Process { dir, entry } => {
-                let w = self.scan_entry(dir, entry)?;
+            QueueTask::Emit(w) => {
                 chan.send(Ok(w)).expect("receiver hung up");
                 Ok(1)
+            }
+
+            QueueTask::Process { dir, entry } => {
+                if let Some(w) = self.scan_entry(dir, entry)? {
+                    chan.send(Ok(w)).expect("receiver hung up");
+                    Ok(1)
+                } else {
+                    Ok(0)
+                }
             }
 
             QueueTask::Noop => Ok(0),
@@ -169,6 +198,10 @@ impl WWMemory {
                 QueueEntry::Scan(dir) => {
                     self.stack = node.next;
                     QueueTask::Scan(dir)
+                }
+                QueueEntry::Emit(w) => {
+                    self.stack = node.next;
+                    QueueTask::Emit(w)
                 }
                 QueueEntry::Process {
                     ref dir,
@@ -210,7 +243,7 @@ impl WWMemory {
         Ok(entries.into())
     }
 
-    fn scan_entry(&mut self, dir: PathBuf, entry: DirEntry) -> io::Result<WalkEntry> {
+    fn scan_entry(&mut self, dir: PathBuf, entry: DirEntry) -> io::Result<Option<WalkEntry>> {
         debug!(
             "{} / {}: scanning entry {}",
             self.config.root.display(),
@@ -225,17 +258,31 @@ impl WWMemory {
         };
         let file_type = meta.file_type();
 
-        if file_type.is_dir() {
-            self.push_dir(path.clone());
-        }
-
-        let w = WalkEntry {
+        let mut w = Some(WalkEntry {
             path,
             file_type,
             size: meta.len(),
             mtime: meta.modified().ok(),
             ctime: meta.created().ok(),
-        };
+        });
+
+        if file_type.is_dir() {
+            let path = w.as_ref().unwrap().path.clone();
+
+            // if the dirst go last, then we want to push the dir's entry before
+            // the directory, so it gets emitted after processing it.
+            if self.config.dirs == DirPosition::Last {
+                self.push_entry(w.take().unwrap());
+            }
+
+            self.push_dir(path);
+
+            // if never, then clear out the entry.
+            if self.config.dirs == DirPosition::Never {
+                w = None;
+            }
+        }
+
         Ok(w)
     }
 }

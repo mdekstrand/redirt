@@ -16,6 +16,10 @@ pub struct ListCmd {
     #[command(flatten)]
     traverse: TraverseFlags,
 
+    /// List directories after their contents
+    #[arg(long = "dirs-last")]
+    dirs_last: bool,
+
     /// The directory to list.
     #[arg(name = "DIR")]
     dir: PathBuf,
@@ -25,8 +29,10 @@ impl Command for ListCmd {
     fn run(&self) -> anyhow::Result<()> {
         info!("listing direectory {:?}", self.dir);
         let mut walk = WalkBuilder::for_directory(&self.dir);
-        walk = walk.follow_symlinks(self.traverse.follow_symlinks);
-        walk = walk.include_hidden(self.traverse.include_hidden);
+        self.traverse.apply_settings(&mut walk);
+        if self.dirs_last {
+            walk.dir_position(crate::walk::DirPosition::Last);
+        }
         let walk = walk.walk();
         let mut n = 0;
         for entry in walk {

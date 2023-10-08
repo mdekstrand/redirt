@@ -1,6 +1,8 @@
 use clap::{Args, Subcommand};
 use enum_dispatch::*;
 
+use crate::walk::WalkBuilder;
+
 mod list;
 
 /// Interface for RDT commands.
@@ -24,4 +26,11 @@ struct TraverseFlags {
     /// Include hidden files
     #[arg(short = 'H', long = "hidden")]
     include_hidden: bool,
+}
+
+impl TraverseFlags {
+    fn apply_settings(&self, walk: &mut WalkBuilder) {
+        walk.follow_symlinks(self.follow_symlinks);
+        walk.include_hidden(self.include_hidden);
+    }
 }
