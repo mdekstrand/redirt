@@ -14,7 +14,7 @@ use crate::stack::Stack;
 
 const DEFAULT_BUFFER: usize = 1000;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DirPosition {
     First,
     Last,
@@ -22,6 +22,7 @@ pub enum DirPosition {
 }
 
 /// Set up a tree-walker.
+#[derive(Clone, Debug)]
 pub struct WalkBuilder {
     root: PathBuf,
     buf_size: usize,
