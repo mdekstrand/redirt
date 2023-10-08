@@ -38,10 +38,7 @@ pub struct Walker {
 /// Single result entry in a tree-walk.
 pub struct WalkEntry {
     path: PathBuf,
-    file_type: FileType,
-    size: u64,
-    mtime: Option<SystemTime>,
-    ctime: Option<SystemTime>,
+    meta: fs::Metadata,
 }
 
 struct WWMemory {
@@ -194,13 +191,7 @@ impl WWMemory {
         };
         let file_type = meta.file_type();
 
-        let mut w = Some(WalkEntry {
-            path,
-            file_type,
-            size: meta.len(),
-            mtime: meta.modified().ok(),
-            ctime: meta.created().ok(),
-        });
+        let mut w = Some(WalkEntry { path, meta });
 
         if file_type.is_dir() {
             let path = w.as_ref().unwrap().path.clone();
@@ -235,5 +226,25 @@ impl WalkEntry {
     /// Get the path of this entry (relative to the root).
     pub fn path(&self) -> &Path {
         self.path.as_path()
+    }
+
+    /// Get the file metadata.
+    pub fn metadata(&self) -> &fs::Metadata {
+        &self.meta
+    }
+
+    /// Get the file type of this entry.
+    pub fn file_type(&self) -> FileType {
+        self.meta.file_type()
+    }
+
+    /// Get the last modification time of this entry.
+    pub fn mtime(&self) -> Option<SystemTime> {
+        self.meta.modified().ok()
+    }
+
+    /// Get the size of this entry.
+    pub fn size(&self) -> u64 {
+        self.meta.len()
     }
 }

@@ -16,6 +16,7 @@ impl<T> Stack<T> {
         Stack { root: None }
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         return self.root.is_none();
     }
@@ -32,6 +33,7 @@ impl<T> Stack<T> {
         })
     }
 
+    #[allow(dead_code)]
     pub fn peek(&self) -> Option<&T> {
         self.root.as_ref().map(|n| &n.data)
     }
