@@ -1,0 +1,11 @@
+{
+    "[jsonc]": {
+        "editor.formatOnSave": true
+    },
+    "[toml]": {
+        "editor.formatOnSave": true
+    },
+    "[rust]": {
+        "editor.formatOnSave": true
+    }
+}
