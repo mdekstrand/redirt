@@ -3,10 +3,7 @@
 //! This module provides a tree-diffing algorihtm to compute the difference between
 //! source and target trees.
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
+use std::{io, path::Path};
 
 use crate::walk::{WalkBuilder, WalkEntry, Walker};
 

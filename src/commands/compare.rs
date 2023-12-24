@@ -5,10 +5,7 @@ use std::path::PathBuf;
 use clap::Args;
 use log::*;
 
-use crate::{
-    diff::{DiffEntry, TreeDiffBuilder},
-    walk::WalkBuilder,
-};
+use crate::diff::{DiffEntry, TreeDiffBuilder};
 
 use super::{Command, TraverseFlags};
 
@@ -20,7 +17,7 @@ pub struct DiffCmd {
     traverse: TraverseFlags,
 
     /// Include unchanged files in output.
-    #[arg(short = 'u', long = "unchaged")]
+    #[arg(short = 'u', long = "unchanged")]
     list_unchanged: bool,
 
     /// The source directory to compare.
@@ -47,7 +44,7 @@ impl Command for DiffCmd {
             let entry = entry?;
             n += 1;
             match entry {
-                DiffEntry::Present { src, tgt } => {
+                DiffEntry::Present { src, tgt: _ } => {
                     if self.list_unchanged {
                         println!("P: {}", src.path().display());
                     }
@@ -58,7 +55,7 @@ impl Command for DiffCmd {
                 DiffEntry::Removed { tgt } => {
                     println!("R: {}", tgt.path().display());
                 }
-                DiffEntry::Modified { src, tgt, .. } => {
+                DiffEntry::Modified { src, tgt: _, .. } => {
                     println!("M: {}", src.path().display());
                 }
             }
