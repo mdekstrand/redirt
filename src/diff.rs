@@ -6,22 +6,28 @@
 use std::{
     fs::File,
     io::{self, BufReader, Read},
-    path::Path,
+    path::{Path, PathBuf},
 };
+
+use log::*;
 
 use crate::walk::{WalkBuilder, WalkEntry, Walker};
 
 /// Set up a tree-diff operation.
 #[derive(Debug, Clone)]
 pub struct TreeDiffBuilder {
+    src_root: PathBuf,
     src: WalkBuilder,
+    tgt_root: PathBuf,
     tgt: WalkBuilder,
     check_content: bool,
 }
 
 /// Iterater over differences between two trees.
 pub struct TreeDiff {
+    src_root: PathBuf,
     src: Walker,
+    tgt_root: PathBuf,
     tgt: Walker,
     s_cur: Option<WalkEntry>,
     t_cur: Option<WalkEntry>,
@@ -55,7 +61,9 @@ pub enum DiffEntry {
 impl TreeDiffBuilder {
     pub fn new<SP: AsRef<Path>, TP: AsRef<Path>>(src: SP, tgt: TP) -> TreeDiffBuilder {
         TreeDiffBuilder {
+            src_root: src.as_ref().to_path_buf(),
             src: WalkBuilder::for_directory(src),
+            tgt_root: tgt.as_ref().to_path_buf(),
             tgt: WalkBuilder::for_directory(tgt),
             check_content: true,
         }
@@ -84,7 +92,9 @@ impl TreeDiffBuilder {
     /// Run the diff.
     pub fn run(self) -> TreeDiff {
         TreeDiff {
+            src_root: self.src_root,
             src: self.src.walk(),
+            tgt_root: self.tgt_root,
             tgt: self.tgt.walk(),
             s_cur: None,
             t_cur: None,
@@ -137,7 +147,12 @@ impl TreeDiff {
                         ch_size,
                         ch_content: false,
                     })
-                } else if self.check_content && !files_are_identical(src.path(), tgt.path())? {
+                } else if self.check_content
+                    && !files_are_identical(
+                        &self.src_root.join(src.path()),
+                        &self.tgt_root.join(tgt.path()),
+                    )?
+                {
                     Some(DiffEntry::Modified {
                         src,
                         tgt,
@@ -164,9 +179,20 @@ impl Iterator for TreeDiff {
 }
 
 fn files_are_identical(f1: &Path, f2: &Path) -> io::Result<bool> {
-    let r1 = File::open(f1)?;
+    debug!(
+        "{} and {} identical, checking content",
+        f1.display(),
+        f2.display()
+    );
+    let r1 = File::open(f1).map_err(|e| {
+        error!("{}: cannot open: {}", f1.display(), e);
+        e
+    })?;
     let r1 = BufReader::new(r1);
-    let r2 = File::open(f2)?;
+    let r2 = File::open(f2).map_err(|e| {
+        error!("{}: cannot open: {}", f1.display(), e);
+        e
+    })?;
     let r2 = BufReader::new(r2);
 
     let mut bi1 = r1.bytes();
