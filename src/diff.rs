@@ -136,8 +136,8 @@ impl TreeDiff {
             (None, Some(tgt)) => Some(DiffEntry::Removed { tgt }),
             (Some(tgt), Some(src)) => {
                 let ch_type = src.file_type() != tgt.file_type();
-                let ch_mtime = src.mtime() != tgt.mtime();
-                let ch_size = src.size() != tgt.size();
+                let ch_mtime = !src.file_type().is_dir() && src.mtime() != tgt.mtime();
+                let ch_size = !src.file_type().is_dir() && src.size() != tgt.size();
                 if ch_type || ch_mtime || ch_size {
                     Some(DiffEntry::Modified {
                         src,
@@ -148,6 +148,7 @@ impl TreeDiff {
                         ch_content: false,
                     })
                 } else if self.check_content
+                    && !src.file_type().is_dir()
                     && !files_are_identical(
                         &self.src_root.join(src.path()),
                         &self.tgt_root.join(tgt.path()),
