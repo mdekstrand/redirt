@@ -3,7 +3,11 @@
 //! This module provides a tree-diffing algorihtm to compute the difference between
 //! source and target trees.
 
-use std::{io, path::Path};
+use std::{
+    fs::File,
+    io::{self, BufReader, Read},
+    path::Path,
+};
 
 use crate::walk::{WalkBuilder, WalkEntry, Walker};
 
@@ -36,7 +40,8 @@ pub enum DiffEntry {
     ///
     /// If the diff is configured not to check content (see  [TreeDiffBuilder::check_content]),
     /// `ch_content` will never be `true`, and modified files with identical sizes and times
-    /// may appear as [DiffEntry::Present].
+    /// may appear as [DiffEntry::Present].  This field is also only set if other file attributes
+    /// are unchanged — if the times or dates change, we don't bother checking content.
     Modified {
         src: WalkEntry,
         tgt: WalkEntry,
@@ -123,15 +128,23 @@ impl TreeDiff {
                 let ch_type = src.file_type() != tgt.file_type();
                 let ch_mtime = src.mtime() != tgt.mtime();
                 let ch_size = src.size() != tgt.size();
-                let ch_content = false;
-                if ch_type || ch_mtime || ch_size || ch_content {
+                if ch_type || ch_mtime || ch_size {
                     Some(DiffEntry::Modified {
                         src,
                         tgt,
                         ch_type,
                         ch_mtime,
                         ch_size,
-                        ch_content,
+                        ch_content: false,
+                    })
+                } else if self.check_content && !files_are_identical(src.path(), tgt.path())? {
+                    Some(DiffEntry::Modified {
+                        src,
+                        tgt,
+                        ch_type: false,
+                        ch_mtime: false,
+                        ch_size: false,
+                        ch_content: true,
                     })
                 } else {
                     Some(DiffEntry::Present { src, tgt })
@@ -148,4 +161,26 @@ impl Iterator for TreeDiff {
     fn next(&mut self) -> Option<Self::Item> {
         self.find_next().transpose()
     }
+}
+
+fn files_are_identical(f1: &Path, f2: &Path) -> io::Result<bool> {
+    let r1 = File::open(f1)?;
+    let r1 = BufReader::new(r1);
+    let r2 = File::open(f2)?;
+    let r2 = BufReader::new(r2);
+
+    let mut bi1 = r1.bytes();
+    let mut bi2 = r2.bytes();
+
+    loop {
+        let b1 = bi1.next().transpose()?;
+        let b2 = bi2.next().transpose()?;
+        match (b1, b2) {
+            (Some(b1), Some(b2)) if b1 == b2 => (),
+            (None, None) => break,
+            _ => return Ok(false),
+        }
+    }
+
+    Ok(true)
 }

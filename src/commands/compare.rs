@@ -16,6 +16,10 @@ pub struct DiffCmd {
     #[command(flatten)]
     traverse: TraverseFlags,
 
+    /// Check the content of files if times and sizes are identical.
+    #[arg(short = 'C', long = "check-content")]
+    check_content: bool,
+
     /// Include unchanged files in output.
     #[arg(short = 'u', long = "unchanged")]
     list_unchanged: bool,
@@ -36,6 +40,7 @@ impl Command for DiffCmd {
         let mut diff = TreeDiffBuilder::new(&self.source, &self.target);
         diff.follow_symlinks(self.traverse.follow_symlinks);
         diff.include_hidden(self.traverse.include_hidden);
+        diff.check_content(self.check_content);
 
         let diff = diff.run();
 
