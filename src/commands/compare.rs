@@ -51,17 +51,17 @@ impl Command for DiffCmd {
             match entry {
                 DiffEntry::Present { src, tgt: _ } => {
                     if self.list_unchanged {
-                        println!("P: {}", src.path().display());
+                        println!("  {}", src.path().display());
                     }
                 }
                 DiffEntry::Added { src } => {
-                    println!("A: {}", src.path().display());
+                    println!("+ {}", src.path().display());
                 }
                 DiffEntry::Removed { tgt } => {
-                    println!("R: {}", tgt.path().display());
+                    println!("- {}", tgt.path().display());
                 }
                 DiffEntry::Modified { src, tgt: _, .. } => {
-                    println!("M: {}", src.path().display());
+                    println!("x {}", src.path().display());
                 }
             }
         }
