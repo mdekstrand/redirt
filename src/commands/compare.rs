@@ -14,7 +14,7 @@ use super::{Command, TraverseFlags};
 const PRESENT_STYLE: Style = Style::new().dimmed();
 const REMOVED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
 const ADDED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
-const MODIFIED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)));
+const MODIFIED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Cyan)));
 
 /// Compare two directories.
 #[derive(Debug, Args)]
