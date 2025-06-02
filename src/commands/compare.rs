@@ -2,12 +2,19 @@
 
 use std::path::PathBuf;
 
+use anstream::println;
+use anstyle::{AnsiColor, Color, Style};
 use clap::Args;
 use log::*;
 
 use crate::diff::{DiffEntry, TreeDiffBuilder};
 
 use super::{Command, TraverseFlags};
+
+const PRESENT_STYLE: Style = Style::new().dimmed();
+const REMOVED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
+const ADDED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Green)));
+const MODIFIED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Yellow)));
 
 /// Compare two directories.
 #[derive(Debug, Args)]
@@ -51,17 +58,37 @@ impl Command for DiffCmd {
             match entry {
                 DiffEntry::Present { src, tgt: _ } => {
                     if self.list_unchanged {
-                        println!("  {}", src.path().display());
+                        println!(
+                            "  {}{}{}",
+                            PRESENT_STYLE.render(),
+                            src.path().display(),
+                            PRESENT_STYLE.render_reset()
+                        );
                     }
                 }
                 DiffEntry::Added { src } => {
-                    println!("+ {}", src.path().display());
+                    println!(
+                        "+ {}{}{}",
+                        ADDED_STYLE.render(),
+                        src.path().display(),
+                        ADDED_STYLE.render_reset()
+                    );
                 }
                 DiffEntry::Removed { tgt } => {
-                    println!("- {}", tgt.path().display());
+                    println!(
+                        "- {}{}{}",
+                        REMOVED_STYLE.render(),
+                        tgt.path().display(),
+                        REMOVED_STYLE.render_reset()
+                    );
                 }
                 DiffEntry::Modified { src, tgt: _, .. } => {
-                    println!("x {}", src.path().display());
+                    println!(
+                        "x {}{}{}",
+                        MODIFIED_STYLE.render(),
+                        src.path().display(),
+                        MODIFIED_STYLE.render_reset()
+                    );
                 }
             }
         }
