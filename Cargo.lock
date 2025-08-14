@@ -441,7 +441,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rdt"
+name = "redirt"
 version = "0.1.0"
 dependencies = [
  "anstream",
