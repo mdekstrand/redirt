@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::path::StripPrefixError;
 
 use thiserror::Error;
 
@@ -18,6 +19,8 @@ pub enum WalkError {
     Ignore(#[from] ignore::Error),
     #[error("IO error: {0}")]
     IO(#[from] io::Error),
+    #[error("invalid path result: {0}")]
+    PathPrefix(#[from] StripPrefixError),
 }
 
 /// Single result entry in a tree-walk.

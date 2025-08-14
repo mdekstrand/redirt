@@ -29,7 +29,7 @@ impl Iterator for FSWalk {
         self.walk.next().map(|e| {
             let entry = e?;
             Ok(WalkEntry {
-                path: entry.path().to_path_buf(),
+                path: entry.path().strip_prefix(self.root())?.to_owned(),
                 meta: Some(entry.metadata()?),
             })
         })
