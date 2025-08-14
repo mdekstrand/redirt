@@ -7,7 +7,7 @@ use std::{
     fs::File,
     io::{self, BufReader, Read},
     os::unix::fs::MetadataExt,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use log::*;
