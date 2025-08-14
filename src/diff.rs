@@ -22,7 +22,7 @@ pub struct TreeDiff {
     tgt: Box<dyn Iterator<Item = Result<WalkEntry, WalkError>>>,
     s_cur: Option<WalkEntry>,
     t_cur: Option<WalkEntry>,
-    check_content: bool,
+    // check_content: bool,
 }
 
 /// Entry representing a difference between trees.
@@ -59,7 +59,7 @@ where
         tgt: Box::new(dst),
         s_cur: None,
         t_cur: None,
-        check_content: false,
+        // check_content: false,
     }
 }
 
@@ -142,6 +142,7 @@ impl Iterator for TreeDiff {
     }
 }
 
+#[allow(dead_code)]
 fn files_are_identical(f1: &Path, f2: &Path) -> io::Result<bool> {
     debug!(
         "{} and {} identical, checking content",

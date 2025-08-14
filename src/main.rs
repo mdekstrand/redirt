@@ -4,7 +4,6 @@ use log::*;
 
 mod commands;
 pub mod diff;
-mod stack;
 pub mod walk;
 
 use commands::{Command, DirCommands};
