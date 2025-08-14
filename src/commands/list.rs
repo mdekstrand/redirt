@@ -5,16 +5,16 @@ use std::path::PathBuf;
 use clap::Args;
 use log::*;
 
-use crate::walk::WalkBuilder;
+use crate::walk::{walk_fs, WalkOptions};
 
-use super::{Command, TraverseFlags};
+use super::Command;
 
 /// List a directory.
 #[derive(Debug, Args)]
 #[command(name = "list")]
 pub struct ListCmd {
     #[command(flatten)]
-    traverse: TraverseFlags,
+    traverse: WalkOptions,
 
     /// List directories after their contents
     #[arg(long = "dirs-last")]
@@ -28,17 +28,16 @@ pub struct ListCmd {
 impl Command for ListCmd {
     fn run(&self) -> anyhow::Result<()> {
         info!("listing direectory {:?}", self.dir);
-        let mut walk = WalkBuilder::for_directory(&self.dir);
-        self.traverse.apply_settings(&mut walk);
+        let walk = walk_fs(&self.dir, &self.traverse);
         if self.dirs_last {
-            walk.dir_position(crate::walk::DirPosition::Last);
+            panic!("unsupported option")
         }
-        let walk = walk.walk();
         let mut n = 0;
         for entry in walk {
             let entry = entry?;
             n += 1;
-            println!("{}", entry.path().display());
+            let sfx = if entry.is_directory() { "/" } else { "" };
+            println!("{}{}", entry.path().display(), sfx);
         }
         info!("{}: walked {} entries", self.dir.display(), n);
         Ok(())

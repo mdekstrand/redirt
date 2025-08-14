@@ -7,9 +7,12 @@ use anstyle::{AnsiColor, Color, Style};
 use clap::Args;
 use log::*;
 
-use crate::diff::{DiffEntry, TreeDiffBuilder};
+use crate::{
+    diff::{diff_walkers, DiffEntry},
+    walk::{walk_fs, WalkOptions},
+};
 
-use super::{Command, TraverseFlags};
+use super::Command;
 
 const PRESENT_STYLE: Style = Style::new().dimmed();
 const REMOVED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::Red)));
@@ -21,7 +24,7 @@ const MODIFIED_STYLE: Style = Style::new().fg_color(Some(Color::Ansi(AnsiColor::
 #[command(name = "compare")]
 pub struct DiffCmd {
     #[command(flatten)]
-    traverse: TraverseFlags,
+    traverse: WalkOptions,
 
     /// Check the content of files if times and sizes are identical.
     #[arg(short = 'C', long = "check-content")]
@@ -44,12 +47,10 @@ impl Command for DiffCmd {
     fn run(&self) -> anyhow::Result<()> {
         info!("source directory {:?}", self.source);
         info!("target directory {:?}", self.target);
-        let mut diff = TreeDiffBuilder::new(&self.source, &self.target);
-        diff.follow_symlinks(self.traverse.follow_symlinks);
-        diff.include_hidden(self.traverse.include_hidden);
-        diff.check_content(self.check_content);
+        let src_walk = walk_fs(&self.source, &self.traverse);
+        let tgt_walk = walk_fs(&self.target, &self.traverse);
 
-        let diff = diff.run();
+        let diff = diff_walkers(src_walk, tgt_walk);
 
         let mut n = 0;
         for entry in diff {

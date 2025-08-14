@@ -20,5 +20,8 @@ clap = { version = "4.0", features = ["derive"] }
 anstream = "^0.6"
 anstyle = "^1.0"
 
+# fs utilities
+ignore = "^0.4"
+
 [target.'cfg(windows)'.dependencies]
 winapi = "^0.3.9"
