@@ -124,7 +124,7 @@ impl CopyCmd {
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 debug!("creating destination directory {}", self.dst.display());
-                fs::create_dir(&self.dst)?;
+                fs::create_dir_all(&self.dst)?;
                 Ok(())
             }
             Err(e) => Err(e),
