@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Recursive Directory Tool"
+repository = "https://github.com/mdekstrand/redirt"
 authors = ["Michael Ekstrand <md@ekstrandom.net>"]
 
 [dependencies]
