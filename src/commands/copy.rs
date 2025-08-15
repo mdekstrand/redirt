@@ -36,8 +36,8 @@ impl Command for CopyCmd {
 
         self.ensure_dest()?;
 
-        let src_walk = walk_fs(&self.src, &self.traverse);
-        let dst_walk = walk_fs(&self.dst, &self.traverse);
+        let src_walk = walk_fs(&self.src, &self.traverse)?;
+        let dst_walk = walk_fs(&self.dst, &self.traverse)?;
         let diff = diff_walkers(src_walk, dst_walk);
         let mut n_files = 0;
         let mut n_dirs = 0;

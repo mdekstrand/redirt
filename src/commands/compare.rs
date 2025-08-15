@@ -47,8 +47,8 @@ impl Command for DiffCmd {
     fn run(&self) -> anyhow::Result<()> {
         info!("source directory {:?}", self.source);
         info!("target directory {:?}", self.target);
-        let src_walk = walk_fs(&self.source, &self.traverse);
-        let tgt_walk = walk_fs(&self.target, &self.traverse);
+        let src_walk = walk_fs(&self.source, &self.traverse)?;
+        let tgt_walk = walk_fs(&self.target, &self.traverse)?;
 
         let diff = diff_walkers(src_walk, tgt_walk);
 

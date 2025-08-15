@@ -28,7 +28,7 @@ pub struct ListCmd {
 impl Command for ListCmd {
     fn run(&self) -> anyhow::Result<()> {
         info!("listing direectory {:?}", self.dir);
-        let walk = walk_fs(&self.dir, &self.traverse);
+        let walk = walk_fs(&self.dir, &self.traverse)?;
         if self.dirs_last {
             panic!("unsupported option")
         }

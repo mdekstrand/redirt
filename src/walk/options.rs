@@ -13,4 +13,8 @@ pub struct WalkOptions {
     /// Do not respect ignore files
     #[arg(short = 'I', long = "no-ignore")]
     pub no_ignore: bool,
+
+    /// Exclude files matching glob
+    #[arg(short = 'E', long = "exclude")]
+    pub exclude: Vec<String>,
 }

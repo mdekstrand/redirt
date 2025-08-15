@@ -1,7 +1,7 @@
 //! File system walks with [ignore].
 use std::path::{Path, PathBuf};
 
-use ignore::{Walk, WalkBuilder};
+use ignore::{overrides::OverrideBuilder, Walk, WalkBuilder};
 
 use crate::walk::{TreeWalk, WalkEntry, WalkError, WalkOptions};
 
@@ -11,15 +11,22 @@ pub struct FSWalk {
     walk: Walk,
 }
 
-pub fn walk_fs<P: AsRef<Path>>(root: P, options: &WalkOptions) -> FSWalk {
+pub fn walk_fs<P: AsRef<Path>>(root: P, options: &WalkOptions) -> Result<FSWalk, WalkError> {
     let root = root.as_ref().to_path_buf();
     let mut wb = WalkBuilder::new(&root);
     wb.ignore(!options.no_ignore);
     wb.follow_links(options.follow_symlinks);
-    wb.hidden(options.include_hidden);
+    wb.hidden(!options.include_hidden);
     wb.sort_by_file_name(|f1, f2| f1.cmp(f2));
+    if !options.exclude.is_empty() {
+        let mut ovb = OverrideBuilder::new(&root);
+        for exc in options.exclude.iter() {
+            ovb.add(&format!("!{}", exc))?;
+        }
+        wb.overrides(ovb.build()?);
+    }
     let walk = wb.build();
-    FSWalk { root, walk }
+    Ok(FSWalk { root, walk })
 }
 
 impl Iterator for FSWalk {
