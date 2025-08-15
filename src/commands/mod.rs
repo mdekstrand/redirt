@@ -2,6 +2,7 @@ use clap::Subcommand;
 use enum_dispatch::*;
 
 mod compare;
+mod copy;
 mod list;
 
 /// Interface for RDT commands.
@@ -15,4 +16,5 @@ pub trait Command {
 pub enum DirCommands {
     List(list::ListCmd),
     Compare(compare::DiffCmd),
+    Copy(copy::CopyCmd),
 }
