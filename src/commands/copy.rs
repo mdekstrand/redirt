@@ -1,14 +1,14 @@
 //! directory listing command
 
+use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 
 use clap::Args;
-use log::*;
 
 use crate::fsutil::stat;
-use crate::walk::{walk_fs, WalkOptions};
+use crate::reporting::*;
+use crate::walk::{WalkOptions, walk_fs};
 
 use super::Command;
 
@@ -29,7 +29,7 @@ pub struct CopyCmd {
 }
 
 impl Command for CopyCmd {
-    fn run(&self) -> anyhow::Result<()> {
+    fn run(&self) -> Result<()> {
         info!("copying directory {:?}", self.src);
         self.create_dir(&self.dst, true)?;
 
@@ -58,7 +58,7 @@ impl Command for CopyCmd {
 }
 
 impl CopyCmd {
-    fn create_dir(&self, dir: &Path, recursive: bool) -> io::Result<bool> {
+    fn create_dir(&self, dir: &Path, recursive: bool) -> Result<bool> {
         if let Some(m) = stat(dir)? {
             if m.is_dir() {
                 debug!("{}: directory already exists", dir.display());
@@ -70,15 +70,16 @@ impl CopyCmd {
         };
 
         debug!("{}: creating directory", dir.display());
-        if recursive {
-            fs::create_dir_all(dir)?;
+        let res = if recursive {
+            fs::create_dir_all(dir)
         } else {
-            fs::create_dir(dir)?;
-        }
+            fs::create_dir(dir)
+        };
+        res.with_path_action("mkdir", &dir)?;
         Ok(true)
     }
 
-    fn copy_file(&self, path: &Path) -> io::Result<bool> {
+    fn copy_file(&self, path: &Path) -> Result<bool> {
         let src_path = self.src.join(path);
         let dst_path = self.dst.join(path);
 
@@ -87,10 +88,10 @@ impl CopyCmd {
         if let Some(m) = stat(&dst_path)? {
             if m.is_dir() {
                 warn!("{}: exists but is directory, removing", path.display());
-                fs::remove_dir_all(&dst_path)?;
+                fs::remove_dir_all(&dst_path).with_path_action("rmtree", &dst_path)?;
             } else if !m.is_file() {
                 warn!("{}: exists but is not file, removing", path.display());
-                fs::remove_file(&dst_path)?;
+                fs::remove_file(&dst_path).with_path_action("rm", &dst_path)?;
             } else if m.modified()? >= src_meta.modified()? && m.size() == src_meta.size() {
                 debug!("{}: exists and is up-to-date", path.display());
                 return Ok(false);
@@ -99,9 +100,9 @@ impl CopyCmd {
 
         let tmp_path = dst_path.with_extension(".rdt.tmp");
         debug!("{}: copying to temporary file", path.display());
-        fs::copy(&src_path, &tmp_path)?;
+        fs::copy(&src_path, &tmp_path).with_path_action("copy", &tmp_path)?;
         debug!("{}: replacing destination file", path.display());
-        fs::rename(&tmp_path, &dst_path)?;
+        fs::rename(&tmp_path, &dst_path).with_path_action("rename", &dst_path)?;
         Ok(true)
     }
 }

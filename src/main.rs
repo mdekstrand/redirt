@@ -5,6 +5,7 @@ use log::*;
 mod commands;
 pub mod diff;
 pub mod fsutil;
+mod reporting;
 pub mod walk;
 
 use commands::{Command, DirCommands};
